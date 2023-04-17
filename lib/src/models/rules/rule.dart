@@ -31,6 +31,7 @@ class Rules {
   Rules(this._rules);
 
   List<Rule> _customRules = [];
+  List<Type> _exceptRuleTypes = [];
 
   final List<Rule> _rules;
   static final Rules _instance = Rules([
@@ -59,11 +60,16 @@ class Rules {
     _customRules = customRules;
   }
 
+  void setExceptRuleTypes(List<Type> ruleTypes) {
+    _exceptRuleTypes = ruleTypes;
+  }
+
   Delta apply(RuleType ruleType, Document document, int index,
       {int? len, Object? data, Attribute? attribute}) {
     final delta = document.toDelta();
     for (final rule in _customRules + _rules) {
-      if (rule.type != ruleType) {
+      if (rule.type != ruleType ||
+          _exceptRuleTypes.contains(rule.runtimeType)) {
         continue;
       }
       try {

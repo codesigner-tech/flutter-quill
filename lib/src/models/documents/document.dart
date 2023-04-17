@@ -52,6 +52,10 @@ class Document {
     _rules.setCustomRules(customRules);
   }
 
+  void setExceptRuleTypes(List<Type> ruleTypes) {
+    _rules.setExceptRuleTypes(ruleTypes);
+  }
+
   final StreamController<DocChange> _observer = StreamController.broadcast();
 
   final History _history = History();
