@@ -15,6 +15,7 @@ export 'src/models/rules/insert.dart';
 export 'src/models/rules/rule.dart';
 export 'src/models/structs/doc_change.dart';
 export 'src/models/structs/image_url.dart';
+export 'src/models/structs/link_dialog_action.dart';
 export 'src/models/structs/offset_value.dart';
 export 'src/models/structs/optional_size.dart';
 export 'src/models/structs/vertical_spacing.dart';

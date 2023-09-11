@@ -22,12 +22,16 @@ class ImageEmbedBuilder extends EmbedBuilder {
   String get key => BlockEmbed.imageType;
 
   @override
+  bool get expanded => false;
+
+  @override
   Widget build(
     BuildContext context,
     QuillController controller,
     base.Embed node,
     bool readOnly,
     bool inline,
+    TextStyle textStyle,
   ) {
     assert(!kIsWeb, 'Please provide image EmbedBuilder for Web');
 
@@ -164,6 +168,7 @@ class ImageEmbedBuilderWeb extends EmbedBuilder {
     Embed node,
     bool readOnly,
     bool inline,
+    TextStyle textStyle,
   ) {
     final imageUrl = node.value.data;
 
@@ -198,6 +203,7 @@ class VideoEmbedBuilder extends EmbedBuilder {
     base.Embed node,
     bool readOnly,
     bool inline,
+    TextStyle textStyle,
   ) {
     assert(!kIsWeb, 'Please provide video EmbedBuilder for Web');
 
@@ -226,6 +232,7 @@ class FormulaEmbedBuilder extends EmbedBuilder {
     base.Embed node,
     bool readOnly,
     bool inline,
+    TextStyle textStyle,
   ) {
     assert(!kIsWeb, 'Please provide formula EmbedBuilder for Web');
 

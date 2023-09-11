@@ -41,6 +41,7 @@ class TextLine extends StatefulWidget {
     required this.linkActionPicker,
     this.textDirection,
     this.customStyleBuilder,
+    this.customRecognizerBuilder,
     this.customLinkPrefixes = const <String>[],
     Key? key,
   }) : super(key: key);
@@ -52,6 +53,7 @@ class TextLine extends StatefulWidget {
   final bool readOnly;
   final QuillController controller;
   final CustomStyleBuilder? customStyleBuilder;
+  final CustomRecognizerBuilder? customRecognizerBuilder;
   final ValueChanged<String>? onLaunchUrl;
   final LinkActionPicker linkActionPicker;
   final List<String> customLinkPrefixes;
@@ -146,15 +148,10 @@ class _TextLineState extends State<TextLine> {
       final embedBuilder = widget.embedBuilder(embed);
       if (embedBuilder.expanded) {
         // Creates correct node for custom embed
-
+        final lineStyle = _getLineStyle(widget.styles);
         return EmbedProxy(
-          embedBuilder.build(
-            context,
-            widget.controller,
-            embed,
-            widget.readOnly,
-            false,
-          ),
+          embedBuilder.build(context, widget.controller, embed, widget.readOnly,
+              false, lineStyle),
         );
       }
     }
@@ -196,7 +193,8 @@ class _TextLineState extends State<TextLine> {
         }
         // Creates correct node for custom embed
         if (child.value.type == BlockEmbed.customType) {
-          child = Embed(CustomBlockEmbed.fromJsonString(child.value.data));
+          child = Embed(CustomBlockEmbed.fromJsonString(child.value.data))
+            ..applyStyle(child.style);
         }
         final embedBuilder = widget.embedBuilder(child);
         final embedWidget = EmbedProxy(
@@ -206,6 +204,7 @@ class _TextLineState extends State<TextLine> {
             child,
             widget.readOnly,
             true,
+            lineStyle,
           ),
         );
         final embed = embedBuilder.buildWidgetSpan(embedWidget);
@@ -280,7 +279,7 @@ class _TextLineState extends State<TextLine> {
       toMerge = defaultStyles.quote!.style;
     } else if (block == Attribute.codeBlock) {
       toMerge = defaultStyles.code!.style;
-    } else if (block == Attribute.list) {
+    } else if (block?.key == Attribute.list.key) {
       toMerge = defaultStyles.lists!.style;
     }
 
@@ -313,12 +312,14 @@ class _TextLineState extends State<TextLine> {
     final isLink = nodeStyle.containsKey(Attribute.link.key) &&
         nodeStyle.attributes[Attribute.link.key]!.value != null;
 
+    final recognizer = _getRecognizer(node, isLink);
+
     return TextSpan(
       text: textNode.value,
       style: _getInlineTextStyle(
           textNode, defaultStyles, nodeStyle, lineStyle, isLink),
-      recognizer: isLink && canLaunchLinks ? _getRecognizer(node) : null,
-      mouseCursor: isLink && canLaunchLinks ? SystemMouseCursors.click : null,
+      recognizer: recognizer,
+      mouseCursor: (recognizer != null) ? SystemMouseCursors.click : null,
     );
   }
 
@@ -351,6 +352,14 @@ class _TextLineState extends State<TextLine> {
         }
       }
     });
+
+    if (nodeStyle.containsKey(Attribute.script.key)) {
+      if (nodeStyle.attributes.values.contains(Attribute.subscript)) {
+        res = _merge(res, defaultStyles.subscript!);
+      } else if (nodeStyle.attributes.values.contains(Attribute.superscript)) {
+        res = _merge(res, defaultStyles.superscript!);
+      }
+    }
 
     if (nodeStyle.containsKey(Attribute.inlineCode.key)) {
       res = _merge(res, defaultStyles.inlineCode!.styleFor(lineStyle));
@@ -398,19 +407,38 @@ class _TextLineState extends State<TextLine> {
     return res;
   }
 
-  GestureRecognizer _getRecognizer(Node segment) {
+  GestureRecognizer? _getRecognizer(Node segment, bool isLink) {
     if (_linkRecognizers.containsKey(segment)) {
       return _linkRecognizers[segment]!;
     }
 
-    if (isDesktop() || widget.readOnly) {
-      _linkRecognizers[segment] = TapGestureRecognizer()
-        ..onTap = () => _tapNodeLink(segment);
-    } else {
-      _linkRecognizers[segment] = LongPressGestureRecognizer()
-        ..onLongPress = () => _longPressLink(segment);
+    if (widget.customRecognizerBuilder != null) {
+      final textNode = segment as leaf.Text;
+      final nodeStyle = textNode.style;
+
+      nodeStyle.attributes.forEach((key, value) {
+        final recognizer = widget.customRecognizerBuilder!.call(value, segment);
+        if (recognizer != null) {
+          _linkRecognizers[segment] = recognizer;
+          return;
+        }
+      });
     }
-    return _linkRecognizers[segment]!;
+
+    if (_linkRecognizers.containsKey(segment)) {
+      return _linkRecognizers[segment]!;
+    }
+
+    if (isLink && canLaunchLinks) {
+      if (isDesktop() || widget.readOnly) {
+        _linkRecognizers[segment] = TapGestureRecognizer()
+          ..onTap = () => _tapNodeLink(segment);
+      } else {
+        _linkRecognizers[segment] = LongPressGestureRecognizer()
+          ..onLongPress = () => _longPressLink(segment);
+      }
+    }
+    return _linkRecognizers[segment];
   }
 
   Future<void> _launchUrl(String url) async {
@@ -1051,9 +1079,16 @@ class RenderEditableTextLine extends RenderEditableBox {
   @override
   void paint(PaintingContext context, Offset offset) {
     if (_leading != null) {
-      final parentData = _leading!.parentData as BoxParentData;
-      final effectiveOffset = offset + parentData.offset;
-      context.paintChild(_leading!, effectiveOffset);
+      if (textDirection == TextDirection.ltr) {
+        final parentData = _leading!.parentData as BoxParentData;
+        final effectiveOffset = offset + parentData.offset;
+        context.paintChild(_leading!, effectiveOffset);
+      } else {
+        final parentData = _leading!.parentData as BoxParentData;
+        final effectiveOffset = offset + parentData.offset;
+        context.paintChild(_leading!,
+            Offset(size.width - _leading!.size.width, effectiveOffset.dy));
+      }
     }
 
     if (_body != null) {
